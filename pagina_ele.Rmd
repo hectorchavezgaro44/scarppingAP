@@ -1,0 +1,92 @@
+---
+title: "Notas Scrapping Ele"
+output: html_document
+---
+
+```{r, include = F}
+knitr::opts_chunk$set(echo = T, 
+message = F,
+warning = F, 
+include = T,
+fig.asp = 0.8, 
+fig.width = 7, 
+out.width = "100%",
+dpi = 300,
+collapse = TRUE,
+comment = "#>"
+) 
+```
+
+```{r, include = F}
+require(pacman)
+p_load(tidyverse, readxl, treemapify, scales, formattable, extrafont, quanteda, quanteda.textplots)
+```
+## ¿Qué hice?
+
+Jalé el código fuente de esta nota de Animal Político <https://www.animalpolitico.com/2021/01/puebla-regresa-semaforo-rojo-12-estados-alerta-maxima/>.
+
+
+```{r}
+pagina = readLines('https://www.animalpolitico.com/2021/01/puebla-regresa-semaforo-rojo-12-estados-alerta-maxima/')
+
+```
+R "jala" el código fuente DE TODA la página con una función que se llama readLines y pone todo el código en una vector caracter. <br />
+Todo el código junto no sirve de nada, R jala hasta los anuncios publicitarios de los lados.<br />
+Tenemos que diferenciar entre las líneas que conforman el artículo y las que solo sirven para programar la página.<br />
+Revisando el código fuente veo que el patrón de los renglones de este artículo empiezan con  p span style=font-weight: 400 
+
+
+![](/Users/hectorchavez/Clase/condigo_fuente.png) 
+![](/Users/hectorchavez/Clase/codigo_fuente_2.png) 
+
+```{r}
+patron <- '<p><span style="font-weight: 400">'
+
+```
+Y termina con /span y /p. Los nombro patron y patron2. 
+```{r}
+patron2 <- '</span></p>'
+
+```
+Uso grep para decirle que se quede con todos los renglones del vector que empiezan con el patrón del texto, para que me deje las líneas que sí importan.  <br />
+```{r}
+datalines = grep(patron,pagina[1:length(pagina)],value=TRUE)
+```
+Con gsub le quito los caracteres del principio (patron) y del final (patron2) de código fuente que me estorban. <br />
+Si no se los quito, me van a salir como los más repetidos y no tiene lógica.
+```{r}
+result = gsub(patron,'',datalines)
+result = gsub(patron2,'',result)
+```
+Y listo, ya tengo un vector de caracteres solo con el contenido que me importa de la nota y lo hago una base de datos con una sola columna. <br />
+Cada renglón de la base es un párrafo de la nota y cambio el nombre de la única columna al nombre texto.
+```{r}
+result <- as.data.frame(result)
+nuevo <- "texto"
+names(result) <- nuevo
+result
+```
+## Pruebitas
+
+Hago una nube de prueba:
+
+```{r}
+  words <- select(result, texto) %>% na.omit() 
+  corp_quanteda <- corpus(words$texto)
+  Nube <- dfm(corp_quanteda, remove = stopwords("spanish"), remove_punct = TRUE)%>%
+    dfm_trim(min_termfreq = 1)
+
+textplot_wordcloud(Nube, min_count = 1, comparison = FALSE, max_words = 300, adjust = 0, rotation   = 0.1, random_order = FALSE,
+                             random_color = FALSE, ordered_color = FALSE,
+                             color = c("#0f4c42", "#cb2833", "#91d400", "#174a80", "#ffc200"))+
+    theme_minimal()
+
+
+```
+Todo en orden. <br />
+Hago una red de palabras cruzadas solo para confirmar que no salió ninguna incoherencia.
+```{r}
+tag_fcm <- fcm(Nube)
+textplot_network(tag_fcm, min_freq = 0.1, edge_alpha = 0.8, edge_size = 5)
+```
+Listo :)
